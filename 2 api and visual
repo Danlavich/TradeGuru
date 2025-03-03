@@ -1,0 +1,105 @@
+import yfinance as yf
+import pandas as pd
+import requests
+from io import StringIO
+import matplotlib.pyplot as plt
+
+def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str ):
+    """
+    Получает данные о ценах акций. Сначала пробует yfinance, если не удаётся — переключается на Finam.
+    
+    :param ticker: Тикер компании (например, "AAPL" или "SBER")
+    :param start_date: Дата начала (формат "YYYY-MM-DD")
+    :param end_date: Дата окончания (формат "YYYY-MM-DD")
+    :param interval: Таймфрейм ("1m", "5m", "1h", "1d", "1wk", "1mo")
+    :return: DataFrame с колонками [Date, Open, Close, Volume]
+    """
+    
+    # 🔹 1. Пробуем через yfinance
+    try:
+        stock = yf.Ticker(ticker)
+        data = stock.history(start=start_date, end=end_date, interval=interval)
+        
+        if not data.empty:
+            df = data[['Open', 'Close', 'Volume']].reset_index()
+            print(f"✅ Данные загружены с Yahoo Finance для {ticker}")
+            return df
+
+    except Exception as e:
+        print(f"⚠ Ошибка при загрузке данных с Yahoo Finance: {e}")
+
+    # 🔹 2. Если yfinance не сработал, пробуем через Finam
+    print(f"🔄 Переключаемся на Finam для {ticker}")
+
+    start_date_finam = start_date.replace("-", "")
+    end_date_finam = end_date.replace("-", "")
+
+    df, mf, yf = int(start_date_finam[6:]), int(start_date_finam[4:6]) - 1, int(start_date_finam[:4])
+    dt, mt, yt = int(end_date_finam[6:]), int(end_date_finam[4:6]) - 1, int(end_date_finam[:4])
+
+    timeframe_map = {"1m": 1, "5m": 2, "10m": 3, "15m": 4, "30m": 5, "1h": 6, "1d": 7, "1wk": 8, "1mo": 9}
+    timeframe = timeframe_map.get(interval, 7)  # По умолчанию — 1 день
+
+    params = {
+        'market': 1,
+        'em': 3,
+        'code': ticker,
+        'apply': 0,
+        'df': df, 'mf': mf, 'yf': yf,
+        'dt': dt, 'mt': mt, 'yt': yt,
+        'p': timeframe,
+        'f': f"{ticker}_{start_date_finam}_{end_date_finam}",
+        'e': '.csv',
+        'cn': ticker,
+        'dtf': 1,
+        'tmf': 1,
+        'MSOR': 1,
+        'mstimever': 1,
+        'sep': 3,
+        'sep2': 1,
+        'datf': 5,
+        'at': 1
+    }
+
+    url = "https://export.finam.ru/" + params['f'] + params['e']
+    response = requests.get(url, params=params)
+
+    if response.status_code == 200 and response.text.strip():
+        csv_data = StringIO(response.text)
+        df = pd.read_csv(csv_data, delimiter=';', encoding='cp1251')
+
+        print(f"✅ Данные загружены с Finam для {ticker}")
+        return df
+    else:
+        print(f"❌ Ошибка загрузки данных с Finam для {ticker}")
+        return None
+
+
+def visualisation(df, ticker):
+    """
+    Визуализирует график закрытия акций.
+    
+    :param df: DataFrame с колонками [Date, Open, Close, Volume]
+    :param ticker: Тикер компании (например, "AAPL" или "SBER")
+    """
+    df.columns = ["date", "time", "open", "high", "low", "close", "vol"]
+    df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+    df.set_index('date', inplace=True)
+    df = df.drop('time', axis=1)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(df['close'], label='Close Price', color='b')
+    plt.title(f'{ticker} Shares')
+    plt.grid()
+    plt.legend()
+    plt.show()
+
+
+ticker = "SBER"  # Заменить на нужный тикер
+start_date = "2024-02-01"
+end_date = "2024-03-01"
+interval = "1d"  # Можно менять
+
+df = get_stock_data(ticker, start_date, end_date, interval)
+if df is not None:
+    visualisation(df, ticker)
