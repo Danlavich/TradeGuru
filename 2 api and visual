@@ -95,11 +95,10 @@ def visualisation(df, ticker):
     plt.show()
 
 
-ticker = "SBER"  # Заменить на нужный тикер
-start_date = "2024-02-01"
-end_date = "2024-03-01"
-interval = "1d"  # Можно менять
+#ticker = "SBER"  # Заменить на нужный тикер
+#end_date = "2024-03-01"
+#interval = "1d"  # Можно менять
 
-df = get_stock_data(ticker, start_date, end_date, interval)
-if df is not None:
-    visualisation(df, ticker)
+#df = get_stock_data(ticker, start_date, end_date, interval)
+#if df is not None:
+ #   visualisation(df, ticker)
