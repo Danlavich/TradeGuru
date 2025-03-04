@@ -25,18 +25,6 @@ import matplotlib.pyplot as plt
 
 
 def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str = "1d"):
-    """
-    Получает исторические данные акций с использованием yfinance,
-    а в случае неудачи — использует Finam.
-
-    Добавляет столбец 'Ticker' для последующей визуализации.
-
-    :param ticker: Тикер акции (например, "AAPL" или "SBER")
-    :param start_date: Дата начала (формат "YYYY-MM-DD")
-    :param end_date: Дата окончания (формат "YYYY-MM-DD")
-    :param interval: Интервал данных (например, "1m", "5m", "1h", "1d", "1wk", "1mo")
-    :return: DataFrame с данными и столбцом 'Ticker'
-    """
     try:
         print(f"⏳ Пробуем загрузить данные с Yahoo Finance для {ticker}...")
         stock = yf.Ticker(ticker)
@@ -112,15 +100,7 @@ def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str = 
 
 
 def visualisation(df):
-    """
-    Визуализирует график цены закрытия акций.
 
-    Функция автоматически определяет столбец с датой и выбирает нужный столбец цены.
-    Тикер для заголовка берется из столбца 'Ticker' (первое значение).
-
-    :param df: DataFrame с данными акций
-    """
-    # Определяем имя тикера
     ticker = df["Ticker"].iloc[
         0] if "Ticker" in df.columns else "Unknown"  # Определяем, какой столбец с датой использовать
     if "date" in df.columns:
@@ -152,9 +132,6 @@ def visualisation(df):
 
 df = get_stock_data("GAZP", "2024-01-01", "2024-04-02", interval="1d")
 
-# if df is not None:
-#     print(df.head())
-#     visualisation(df)
 
 
 def preprocess(df, target):
@@ -230,14 +207,6 @@ def fb_prophet_prediction(df, target):
     plt.title('Прогноз  by FB Prophet')
     plt.show()
 
-    # plt.plot(combined_actual.index, combined_actual.values, color='blue', label='Training Data')
-    # plt.plot(valid_set.index, valid_set['y'], color='red', label='Validation Data')
-    # plt.plot(valid_set['Predictions'],color='orange', linestyle='--', label='Predicted Data')
-    # plt.xlabel('Год',size=20)
-    # plt.ylabel('price')
-    # plt.title('Прогноз  by FB Prophet')
-    # plt.legend(['Model Training Data', 'Actual Data', 'Predicted Data'])
-    # plt.show()
 
 
 def power_set_recursive(s):
@@ -318,14 +287,6 @@ def lin_log_regression(X, y):
     y_pred = np.exp(y_pred) - 1
     # y_test= np.exp(y_test) - 1
     mse = mean_squared_error(y[train_size:], y_pred)
-    # print(rmse)
-
-    # plt.plot(y[:train_size],color='r',label='train')
-    # plt.plot(y[train_size:],color='b',label='test')
-    # plt.plot(y_pred,color='orange',label='pred')
-    # plt.grid()
-    # plt.legend()
-    # plt.show()
     if (p_values < alpha).all():
         return mse, name, y_pred
     else:
@@ -415,9 +376,6 @@ def best_model(df, target='30-90'):
         fb_prophet_prediction(df, target)
         best(df, target, features=None)
 
-    # print(f'best MSE Regression {best_mse}')
-    # print(f'best Features  Regression {best_feat}')
-    # print(f'best model  Regression {best_model[1]}')
 
 df=preprocess(df,'close')
 
