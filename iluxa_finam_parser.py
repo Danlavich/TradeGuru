@@ -55,13 +55,13 @@ def finam_pars():
 
 
 def visualisation(df, name):
-    df.columns = ["date", "time", "open", "high", "low", "close", "vol"]
-    df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
-    df.set_index('date', inplace=True)
-    df = df.drop('time', axis=1)
+    df.columns = ["Date", "Time", "Open", "High", "Low", "Close", "Volume"]
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y%m%d')
+    df.set_index('Date', inplace=True)
+    df = df.drop('Time', axis=1)
 
     plt.figure(figsize=(12, 6))
-    plt.plot(df['close'], label='close', color='b')
+    plt.plot(df['Close'], label='Close', color='b')
     plt.title(f'{name} shares ')
     plt.grid()
     plt.legend()
