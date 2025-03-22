@@ -1,12 +1,16 @@
+#pip install TA-Lib
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import talib
 
 def get_stock_data(ticker: str, start_date: str, end_date: str):
     stock = yf.Ticker(ticker)
     data = stock.history(start=start_date, end=end_date)
-    df = data[['Open', 'Close', 'Volume']].reset_index()
+    df = data[['Open', 'Close', 'High', 'Low', 'Volume']].reset_index()
     return df
 
 df = get_stock_data("AAPL", "2024-01-01", "2024-02-01")
@@ -78,6 +82,22 @@ def calculate_bollinger_bands(df, window=20, num_std_dev=2):
     lower_band = ma - (rolling_std * num_std_dev)
     return upper_band, lower_band
 
+# 11. Стохастический осциллятор (Stochastic Oscillator)
+def calculate_stochastic_oscillator(df, window=14):
+    high14 = df['high'].rolling(window=window).max()
+    low14 = df['low'].rolling(window=window).min()
+    stochastic = 100 * (df['close'] - low14) / (high14 - low14)
+    return stochastic
+
+# 12. Свечные паттерны
+def calculate_candlestick_patterns(df):
+    patterns = {
+        'Bullish Engulfing': talib.CDLENGULFING(df['open'], df['high'], df['low'], df['close']),
+        'Hammer': talib.CDLHAMMER(df['open'], df['high'], df['low'], df['close']),
+        'Shooting Star': talib.CDLSHOOTINGSTAR(df['open'], df['high'], df['low'], df['close'])
+    }
+    return patterns
+
 # Расчет метрик
 df['volume'] = calculate_volume(df)
 df['moving_average_20'] = moving_average(df, window=20)
@@ -88,18 +108,21 @@ df['percentage_change'] = calculate_percentage_change(df)
 df['macd'] = calculate_macd(df)
 df['macd_signal'] = calculate_macd_signal(df)
 df['bollinger_upper'], df['bollinger_lower'] = calculate_bollinger_bands(df)
+df['stochastic'] = calculate_stochastic_oscillator(df)
+candlestick_patterns = calculate_candlestick_patterns(df)
 
 fib_levels = fibonacci_levels(df)
 
 # Вывод результатов
 print(df.tail())
 print("Уровни Фибоначчи:", fib_levels)
+print("Свечные паттерны:", candlestick_patterns)
 
 # Визуализация
-plt.figure(figsize=(14, 10))
+plt.figure(figsize=(14, 12))
 
 # График цен и скользящих средних
-plt.subplot(3, 1, 1)
+plt.subplot(4, 1, 1)
 plt.plot(df.index, df['close'], label='Цена закрытия', color='blue')
 plt.plot(df.index, df['moving_average_20'], label='20-дневная скользящая средняя', color='orange')
 plt.plot(df.index, df['exponential_moving_average_20'], label='20-дневная экспоненциальная скользящая средняя', color='green')
@@ -107,7 +130,7 @@ plt.title('Цена акций AAPL и Скользящие Средние')
 plt.legend()
 
 # График RSI
-plt.subplot(3, 1, 2)
+plt.subplot(4, 1, 2)
 plt.plot(df.index, df['rsi'], label='RSI', color='purple')
 plt.axhline(70, linestyle='--', alpha=0.5, color='red')
 plt.axhline(30, linestyle='--', alpha=0.5, color='green')
@@ -115,10 +138,18 @@ plt.title('Индекс Относительной Силы (RSI)')
 plt.legend()
 
 # График MACD
-plt.subplot(3, 1, 3)
+plt.subplot(4, 1, 3)
 plt.plot(df.index, df['macd'], label='MACD', color='blue')
 plt.plot(df.index, df['macd_signal'], label='Сигнальная линия MACD', color='orange')
 plt.title('MACD')
+plt.legend()
+
+# График стохастического осциллятора
+plt.subplot(4, 1, 4)
+plt.plot(df.index, df['stochastic'], label='Стохастический осциллятор', color='brown')
+plt.axhline(80, linestyle='--', alpha=0.5, color='red')
+plt.axhline(20, linestyle='--', alpha=0.5, color='green')
+plt.title('Стохастический осциллятор')
 plt.legend()
 
 plt.tight_layout()
