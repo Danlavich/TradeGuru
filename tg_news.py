@@ -16,18 +16,17 @@ async def fetch_telegram_news(channel_username, api_id, api_hash, phone, start_d
 
         print(f"📡 Загружаем сообщения с {start_date} по {end_date}...")
 
-        # Загружаем сообщения от end_date назад до start_date
+ 
         async for message in client.iter_messages(channel_username, offset_date=end_date, reverse=False):
             if message.date < start_date:
-                break  # если сообщение раньше start_date — выходим
-
+                break  
             if start_date <= message.date <= end_date:
                 if message.text:
                     messages.append(f"{message.date}: {message.text}\n\n")
                 else:
                     messages.append(f"{message.date}: [Нет текста, возможно медиа или ссылка]\n\n")
 
-        # Сохраняем в файл
+      
         filename = f"{channel_username}_{start_date.date()}_to_{end_date.date()}.txt"
         with open(filename, "w", encoding="utf-8") as file:
             file.writelines(messages)
@@ -40,13 +39,11 @@ def get_news_by_date(channel_username, start_str, end_str):
     api_hash = "c5b7c5b54aceb2eb7f9424ef614b54c2"
     phone = "+79373711555"
 
-    # Преобразуем строки в datetime с UTC
+
     start_date = parser.parse(start_str).replace(tzinfo=timezone.utc)
     end_date = parser.parse(end_str).replace(tzinfo=timezone.utc)
 
     asyncio.run(fetch_telegram_news(channel_username, api_id, api_hash, phone, start_date, end_date))
 
-
-# 🔽 Укажи нужный канал и даты здесь:
 if __name__ == "__main__":
     get_news_by_date("cb_economics", "2025-01-10", "2025-01-15")
