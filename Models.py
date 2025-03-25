@@ -372,7 +372,6 @@ def best_regr(df, target, graph=0,features=None):
     for feat in features:
 
         models_array.append(log_log_regression(X[feat], y))
-        models_array.append(polynomial_regression(X[feat], y, degree=1))
         models_array.append(linear_regression(X[feat], y))
         curr_smape = min(models_array, key=lambda x: x[0])
         if curr_smape[0] != None:
@@ -392,7 +391,7 @@ def best_regr(df, target, graph=0,features=None):
         plt.grid()
         plt.legend()
         plt.show()
-    return best_smape,best_model[1]
+    return best_model[1]
 
 
 def objective_cat(trial, X_train, X_val, y_train, y_val):
