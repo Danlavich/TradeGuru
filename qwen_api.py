@@ -11,12 +11,13 @@ prompt = ("You are an expert broker. You have to make predictions how the relate
           "You will be given the company's ticker and economy news that may affect the company's stock prices."
           "Your task is to work with the value of stock rating, which has to be in range of -1 to 1,"
           "where -1 is absolute fall of stock price, 0 means the price remains exactly the same and 1 means greatest possible growth of stocks price."
-          "You will be given the latest value of stock rating and you have to decide how the given news would affect it."
+          "You will be given the latest value of stock rating and you have to decide how the given news would affect it, "
+          "so if the value was positive and the news affect the stock price positively, the value becomes even higher and vice versa."
           "If you are not given the latest value, you have to decide what it is from scratch. Your response has to contain only the result value."
           "The ticker of the company, stock price of which you are going to work with: "
           )
 #Передаем нужный тикер
-ticker = "AAPL"
+ticker = "SBER"
 prompt += ticker
 
 #to do добавить уже существующее велью
