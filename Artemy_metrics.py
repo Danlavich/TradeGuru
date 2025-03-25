@@ -1,63 +1,51 @@
+#pip install TA-Lib
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import talib
 
-# Функция для получения исторических данных акций
-# ticker: строка с символом акции, например "AAPL"
-# start_date: строка с начальной датой в формате "YYYY-MM-DD"
-# end_date: строка с конечной датой в формате "YYYY-MM-DD"
-# Возвращает DataFrame с колонками 'Open', 'Close', 'Volume' и индексом по датам
 def get_stock_data(ticker: str, start_date: str, end_date: str):
     stock = yf.Ticker(ticker)
     data = stock.history(start=start_date, end=end_date)
-    df = data[['Open', 'Close', 'Volume']].reset_index()
-    df.columns = ['Date', 'Open', 'Close', 'Volume']  # Set column names to uppercase
+    df = data[['Open', 'Close', 'High', 'Low', 'Volume']].reset_index()
     return df
 
-# Получение данных акций Apple с 1 января по 1 февраля 2024 года
 df = get_stock_data("AAPL", "2024-01-01", "2024-02-01")
-df.set_index('Date', inplace=True) # Установка даты в качестве индекса DataFrame
-#df.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True) # Переименование колонок для удобства
+df.set_index('Date', inplace=True)
+df.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
 
 # 1. Объём продаж (volume)
-# Возвращает колонку 'volume' из DataFrame
 def calculate_volume(df):
-    return df['Volume']
+    return df['volume']
 
 # 2. Скользящие средние (Moving Average)
-# window: целое число, задающее окно для скользящей средней
-# Возвращает скользящую среднюю закрытия на заданном окне
 def moving_average(df, window):
-    return df['Close'].rolling(window=window).mean()
+    return df['close'].rolling(window=window).mean()
 
 # 3. Экспоненциальные скользящие средние (Exponential Moving Average)
-# window: целое число, задающее окно для экспоненциальной скользящей средней
-# Возвращает экспоненциальную скользящую среднюю закрытия на заданном окне
 def exponential_moving_average(df, window):
-    return df['Close'].ewm(span=window, adjust=False).mean()
+    return df['close'].ewm(span=window, adjust=False).mean()
 
 # 4. Индекс относительной силы (RSI)
-# window: целое число, задающее окно для расчета RSI (по умолчанию 14)
-# Рассчитывает RSI на основе изменений цен закрытия и возвращает его значение
 def calculate_rsi(df, window=14):
-    delta = df['Close'].diff() # Изменения цен закрытия
-    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean() # Средний прирост
-    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean() # Среднее снижение
-    rs = gain / loss # Отношение прироста к снижению
-    rsi = 100 - (100 / (1 + rs)) # Расчет RSI
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
     return rsi
 
 # 5. Уровни Фибоначчи
-# Рассчитывает уровни Фибоначчи на основе максимальной и минимальной цены закрытия
-# Возвращает словарь с уровнями Фибоначчи и максимальной/минимальной ценами
 def fibonacci_levels(df):
-    max_price = df['Close'].max() # Максимальная цена
-    min_price = df['Close'].min() # Минимальная цена
-    diff = max_price - min_price # Разница между максимальной и минимальной ценами
-    level1 = max_price - 0.236 * diff # Уровень 23.6%
-    level2 = max_price - 0.382 * diff # Уровень 38.2%
-    level3 = max_price - 0.618 * diff # Уровень 61.8%
+    max_price = df['close'].max()
+    min_price = df['close'].min()
+    diff = max_price - min_price
+    level1 = max_price - 0.236 * diff
+    level2 = max_price - 0.382 * diff
+    level3 = max_price - 0.618 * diff
     return {
         'level1': level1,
         'level2': level2,
@@ -67,95 +55,102 @@ def fibonacci_levels(df):
     }
 
 # 6. Стандартное отклонение (Volatility)
-# window: целое число, задающее окно для расчета стандартного отклонения
-# Рассчитывает стандартное отклонение цен закрытия на заданном окне и возвращает его значение
 def calculate_volatility(df, window=20):
-    return df['Close'].rolling(window=window).std()
+    return df['close'].rolling(window=window).std()
 
 # 7. Процент изменения (Percentage Change)
-# Рассчитывает процентное изменение цен закрытия и возвращает его значение
 def calculate_percentage_change(df):
-    return df['Close'].pct_change() * 100
+    return df['close'].pct_change() * 100
 
 # 8. MACD
-# Рассчитывает MACD (скользящая средняя конвергенции/дивергенции) на основе экспоненциальных скользящих средних
-# Возвращает значение MACD
 def calculate_macd(df):
-    ema12 = exponential_moving_average(df, 12) # 12-дневная EMA
-    ema26 = exponential_moving_average(df, 26) # 26-дневная EMA
-    macd = ema12 - ema26 # Разница между EMA
+    ema12 = exponential_moving_average(df, 12)
+    ema26 = exponential_moving_average(df, 26)
+    macd = ema12 - ema26
     return macd
 
 # 9. MACD Signal Line
-# window: целое число, задающее окно для расчета сигнальной линии MACD (по умолчанию 9)
-# Рассчитывает сигнальную линию MACD на основе значения MACD и возвращает ее
 def calculate_macd_signal(df, window=9):
-    macd = calculate_macd(df) # Значение MACD
-    return macd.rolling(window=window).mean() # Сигнальная линия MACD
+    macd = calculate_macd(df)
+    return macd.rolling(window=window).mean()
 
 # 10. Bollinger Bands
-# window: целое число, задающее окно для расчета полос Боллинджера (по умолчанию 20)
-# num_std_dev: количество стандартных отклонений для расчета верхней и нижней полосы (по умолчанию 2)
-# Рассчитывает верхнюю и нижнюю полосы Боллинджера и возвращает их значения
 def calculate_bollinger_bands(df, window=20, num_std_dev=2):
-    ma = moving_average(df, window) # Скользящая средняя
-    rolling_std = df['Close'].rolling(window).std() # Стандартное отклонение
-    upper_band = ma + (rolling_std * num_std_dev) # Верхняя полоса
-    lower_band = ma - (rolling_std * num_std_dev) # Нижняя полоса
+    ma = moving_average(df, window)
+    rolling_std = df['close'].rolling(window).std()
+    upper_band = ma + (rolling_std * num_std_dev)
+    lower_band = ma - (rolling_std * num_std_dev)
     return upper_band, lower_band
 
-# Функция для расчета всех метрик
-def calculateMetrics(df):
-    #df.set_index('Date', inplace=True) # Установка даты в качестве индекса (не используется здесь)
-    #df.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True) # Переименование колонок
+# 11. Стохастический осциллятор (Stochastic Oscillator)
+def calculate_stochastic_oscillator(df, window=14):
+    high14 = df['high'].rolling(window=window).max()
+    low14 = df['low'].rolling(window=window).min()
+    stochastic = 100 * (df['close'] - low14) / (high14 - low14)
+    return stochastic
 
-    # Расчет различных метрик и добавление их в DataFrame
-    df['Volume'] = calculate_volume(df) # Объем продаж
-    df['moving_average_20'] = moving_average(df, window=20) # 20-дневная скользящая средняя
-    df['exponential_moving_average_20'] = exponential_moving_average(df, window=20) # 20-дневная EMA
-    df['rsi'] = calculate_rsi(df) # RSI
-    df['volatility'] = calculate_volatility(df) # Волатильность
-    df['percentage_change'] = calculate_percentage_change(df) # Процент изменения
-    df['macd'] = calculate_macd(df) # MACD
-    df['macd_signal'] = calculate_macd_signal(df) # Сигнальная линия MACD
-    df['bollinger_upper'], df['bollinger_lower'] = calculate_bollinger_bands(df) # Полосы Боллинджера
+# 12. Свечные паттерны
+def calculate_candlestick_patterns(df):
+    patterns = {
+        'Bullish Engulfing': talib.CDLENGULFING(df['open'], df['high'], df['low'], df['close']),
+        'Hammer': talib.CDLHAMMER(df['open'], df['high'], df['low'], df['close']),
+        'Shooting Star': talib.CDLSHOOTINGSTAR(df['open'], df['high'], df['low'], df['close'])
+    }
+    return patterns
 
-    fib_levels = fibonacci_levels(df) # Уровни Фибоначчи
+# Расчет метрик
+df['volume'] = calculate_volume(df)
+df['moving_average_20'] = moving_average(df, window=20)
+df['exponential_moving_average_20'] = exponential_moving_average(df, window=20)
+df['rsi'] = calculate_rsi(df)
+df['volatility'] = calculate_volatility(df)
+df['percentage_change'] = calculate_percentage_change(df)
+df['macd'] = calculate_macd(df)
+df['macd_signal'] = calculate_macd_signal(df)
+df['bollinger_upper'], df['bollinger_lower'] = calculate_bollinger_bands(df)
+df['stochastic'] = calculate_stochastic_oscillator(df)
+candlestick_patterns = calculate_candlestick_patterns(df)
 
-    # Вывод результатов
-    print(df.tail()) # Печать последних строк DataFrame
-    print("Уровни Фибоначчи:", fib_levels) # Печать уровней Фибоначчи
+fib_levels = fibonacci_levels(df)
 
-    # Визуализация
-    plt.figure(figsize=(14, 10))
+# Вывод результатов
+print(df.tail())
+print("Уровни Фибоначчи:", fib_levels)
+print("Свечные паттерны:", candlestick_patterns)
 
-    # График цен и скользящих средних
-    plt.subplot(3, 1, 1) # Создание подграфика
-    plt.plot(df.index, df['Close'], label='Цена закрытия', color='blue') # График цены закрытия
-    plt.plot(df.index, df['moving_average_20'], label='20-дневная скользящая средняя', color='orange') # График 20-дневной SMA
-    plt.plot(df.index, df['exponential_moving_average_20'], label='20-дневная экспоненциальная скользящая средняя', color='green') # График 20-дневной EMA
-    plt.title('Цена акций AAPL и Скользящие Средние') # Заголовок графика
-    plt.legend() # Легенда графика
+# Визуализация
+plt.figure(figsize=(14, 12))
 
-    # График RSI
-    plt.subplot(3, 1, 2) # Создание подграфика
-    plt.plot(df.index, df['rsi'], label='RSI', color='purple') # График RSI
-    plt.axhline(70, linestyle='--', alpha=0.5, color='red') # Линия 70 на графике RSI
-    plt.axhline(30, linestyle='--', alpha=0.5, color='green') # Линия 30 на графике RSI
-    plt.title('Индекс Относительной Силы (RSI)') # Заголовок графика
-    plt.legend() # Легенда графика
+# График цен и скользящих средних
+plt.subplot(4, 1, 1)
+plt.plot(df.index, df['close'], label='Цена закрытия', color='blue')
+plt.plot(df.index, df['moving_average_20'], label='20-дневная скользящая средняя', color='orange')
+plt.plot(df.index, df['exponential_moving_average_20'], label='20-дневная экспоненциальная скользящая средняя', color='green')
+plt.title('Цена акций AAPL и Скользящие Средние')
+plt.legend()
 
-    # График MACD
-    plt.subplot(3, 1, 3) # Создание подграфика
-    plt.plot(df.index, df['macd'], label='MACD', color='blue') # График MACD
-    plt.plot(df.index, df['macd_signal'], label='Сигнальная линия MACD', color='orange') # График сигнальной линии MACD
-    plt.title('MACD') # Заголовок графика
-    plt.legend() # Легенда графика
+# График RSI
+plt.subplot(4, 1, 2)
+plt.plot(df.index, df['rsi'], label='RSI', color='purple')
+plt.axhline(70, linestyle='--', alpha=0.5, color='red')
+plt.axhline(30, linestyle='--', alpha=0.5, color='green')
+plt.title('Индекс Относительной Силы (RSI)')
+plt.legend()
 
-    plt.tight_layout() # Автоматическая подгонка подграфиков
-    plt.show() # Отображение графиков
+# График MACD
+plt.subplot(4, 1, 3)
+plt.plot(df.index, df['macd'], label='MACD', color='blue')
+plt.plot(df.index, df['macd_signal'], label='Сигнальная линия MACD', color='orange')
+plt.title('MACD')
+plt.legend()
 
-# Пример использования:
-df = get_stock_data("AAPL", "2024-01-01", "2024-02-01")
-df.set_index('Date', inplace=True)
-calculateMetrics(df.copy())  # Pass a copy to avoid modifying the original DataFrame
+# График стохастического осциллятора
+plt.subplot(4, 1, 4)
+plt.plot(df.index, df['stochastic'], label='Стохастический осциллятор', color='brown')
+plt.axhline(80, linestyle='--', alpha=0.5, color='red')
+plt.axhline(20, linestyle='--', alpha=0.5, color='green')
+plt.title('Стохастический осциллятор')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
