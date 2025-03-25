@@ -5,7 +5,7 @@ from io import StringIO
 import matplotlib.pyplot as plt
 import pandas as pd
 
-def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str = "1d"):
+def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str):
     """
     Получает исторические данные акций с использованием yfinance,
     а в случае неудачи — использует Finam.
@@ -25,9 +25,11 @@ def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str = 
         if data is not None and not data.empty:
             df = data[['Open', 'Close', 'Volume']].reset_index()
             # При получении через yfinance имя столбца даты – "Datetime"
-            df.rename(columns={"Datetime": "date"}, inplace=True)
+            df.rename(columns={"Datetime": "Date", "Open": "Open", "Close": "Close", "Volume": "Volume"}, inplace=True)
             df["Ticker"] = ticker
             print(f"✅ Данные загружены с Yahoo Finance для {ticker}")
+            #df.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
+            df.columns = ["Date", "Open", "Close", "Volume", "Ticker"]
             return df
         else:
             print(f"⚠ Нет данных в Yahoo Finance для {ticker}. Пробуем Finam...")
@@ -77,17 +79,20 @@ def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str = 
         if response.status_code == 200 and response.text.strip():
             csv_data = StringIO(response.text)
             df_finam = pd.read_csv(csv_data, delimiter=';', encoding='cp1251')
-            df_finam.columns = ["date", "time", "open", "high", "low", "close", "vol"]
-            df_finam['date'] = pd.to_datetime(df_finam['date'], format='%Y%m%d')
-            df_finam.set_index('date', inplace=True)
-            df_finam.drop(columns=['time'], inplace=True)
+            df_finam.columns = ["Date", "Time", "Open", "High", "Low", "Close", "Volume"]
+            df_finam['Date'] = pd.to_datetime(df_finam['Date'], format='%Y%m%d')
+            df_finam.set_index('Date', inplace=True)
+            df_finam.drop(columns=['Time'], inplace=True)
             df_finam["Ticker"] = ticker
             print(f"✅ Данные загружены с Finam для {ticker}")
             # Вернем DataFrame, сбросив индекс для унификации структуры
+
+            #df_finam.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'vol'}, inplace=True)
             return df_finam.reset_index()
         else:
             print(f"❌ Ошибка загрузки данных с Finam для {ticker}")
             return None
+
 def visualisation(df):
     """
     Визуализирует график цены закрытия акций.
@@ -98,11 +103,12 @@ def visualisation(df):
     :param df: DataFrame с данными акций
     """
     # Определяем имя тикера
-    ticker = df["Ticker"].iloc[
-        0] if "Ticker" in df.columns else "Unknown"  # Определяем, какой столбец с датой использовать
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df.set_index("date", inplace=True)
+    ticker = df["Ticker"].iloc[0] if "Ticker" in df.columns else "Unknown"
+
+    # Определяем, какой столбец с датой использовать
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df.set_index("Date", inplace=True)
     elif "Datetime" in df.columns:
         df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
         df.set_index("Datetime", inplace=True)
@@ -126,10 +132,9 @@ def visualisation(df):
     plt.legend()
     plt.show()
 
-df = get_stock_data("SBER", "2024-01-01", "2024-02-01", interval="1h")
-print(df)
-
-if df is not None:
-    print(df.head())
-    visualisation(df)
-
+# # Example usage:
+# df = get_stock_data("SBER", "2024-01-01", "2024-02-01", interval="1h")
+#
+# if df is not None:
+#     print(df.head())
+#     visualisation(df)

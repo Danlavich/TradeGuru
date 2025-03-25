@@ -18,7 +18,7 @@ def predict_stock_price(df):
     df.dropna(inplace=True)
     
     # Определение признаков (X) и целевой переменной (y)
-    features = ['Open', 'Volume', 'moving_average_20', 'exponential_moving_average_20', 
+    features = ['Open', 'moving_average_20', 'exponential_moving_average_20',
                 'rsi', 'volatility', 'percentage_change', 'macd', 'macd_signal', 
                 'bollinger_upper', 'bollinger_lower']
     
