@@ -32,7 +32,7 @@ df=Models.get_stock_data('GAZP','2020-03-23','2025-03-22', "1d")
 df_=df.copy()
 
 # Метрики Артемия
-DF=Artemy_metrics.calculateMetrics(df_)
+# DF=Artemy_metrics.calculateMetrics(df_)
 
 
 # Препроцесс

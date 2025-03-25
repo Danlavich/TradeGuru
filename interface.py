@@ -1,5 +1,5 @@
 import flet as ft
-
+from visualisation_parse import get_stock_data, visualisation
 def interface(page: ft.Page):
     page.title = "Stock Data Visualizer"
 
@@ -25,11 +25,11 @@ def interface(page: ft.Page):
         end_date = end_date_input.value
         interval = interval_input.value
 
-        #df = get_stock_data(ticker, start_date, end_date, interval)
-        #if df is not None:
-            #print(df.head())
-            #visualisation(df)
-        #Функции Артемия Дани Матвея Илюхи
+        df = get_stock_data(ticker, start_date, end_date, interval)
+        if df is not None:
+            print(df.head())
+            visualisation(df)
+        # Функции Артемия Дани Матвея Илюхи
 
     analyze_button = ft.ElevatedButton(text="Analyze", on_click=analyze_data)
 
@@ -43,4 +43,4 @@ def interface(page: ft.Page):
         ])
     )
 
-ft.app(target=interface())
+ft.app(target=interface)
