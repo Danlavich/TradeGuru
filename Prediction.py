@@ -59,11 +59,9 @@ def auto_arima_forecast(df, feat, future_index, graph=0):
 
 def fb_prophet_forecast(df, target, future_index, graph=0):
     df_new = df[[target]].copy()
-    df_new = df_new.reset_index()
-    
-   
-    df_new.rename(columns={target: 'y'}, inplace=True)
-    df_new['ds'] = pd.to_datetime(df_new[df_new.columns[0]])
+    df_new.reset_index(inplace=True)
+    df_new.rename(columns={target: 'y', df.index.name: 'ds'}, inplace=True)
+    df_new['ds'] = pd.to_datetime(df_new['ds'])
 
    
     logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
@@ -74,8 +72,7 @@ def fb_prophet_forecast(df, target, future_index, graph=0):
         'seasonality_prior_scale': [0.1, 1.0, 10.0],
         'seasonality_mode': ['additive', 'multiplicative']
     }
-
-    from sklearn.model_selection import ParameterGrid
+    
     best_params = None
     best_mse = float("inf")
 
@@ -86,17 +83,15 @@ def fb_prophet_forecast(df, target, future_index, graph=0):
             seasonality_mode=params['seasonality_mode'],
             yearly_seasonality=True
         )
+       
+        model.fit(df_new)
+        forecast_temp = model.predict(df_new[['ds']])
+        mse = ((df_new['y'] - forecast_temp['yhat'])**2).mean()
+        
+        if mse < best_mse:
+            best_mse = mse
+            best_params = params
 
-        try:
-            model.fit(df_new)
-            forecast_temp = model.predict(df_new[['ds']])
-            mse = ((df_new['y'] - forecast_temp['yhat'])**2).mean()
-
-            if mse < best_mse:
-                best_mse = mse
-                best_params = params
-        except:
-            continue
 
    
     best_model = Prophet(
@@ -106,8 +101,6 @@ def fb_prophet_forecast(df, target, future_index, graph=0):
         yearly_seasonality=True
     )
     best_model.fit(df_new)
-
-   
     future = pd.DataFrame({'ds': pd.to_datetime(future_index)})
     forecast = best_model.predict(future)
 
