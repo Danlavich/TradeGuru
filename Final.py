@@ -23,32 +23,12 @@ import importlib
 import Models
 import Prediction
 import Artemy_metrics
+
 importlib.reload(Prediction)
 importlib.reload(Models)
 importlib.reload(Artemy_metrics)
 
-# Импорт данных 
-df=Models.get_stock_data('GAZP','2020-03-23','2025-03-22', "1d")
-df_=df.copy()
-
-# Метрики Артемия
-DF=Artemy_metrics.calculateMetrics(df_)
-
-
-# Препроцесс
-df=Models.preprocess(df,'close')
-df=df.interpolate(method='linear')
-
-
-# Определение будущих индексов
-last_date = df.index[-1]  
-future_index = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=30, freq='D')
-
-# Определение лучшей регресии
-name_regr=Models.best_regr(df,'close',0)
-
-# Прогноз
-def prediction(name):
+def prediction(df,name,future_index):
 
    if name=='log-log':
        regr=Prediction.log_log_regression_forecast(df,'close',future_index)
@@ -63,9 +43,33 @@ def prediction(name):
 
 
    final=0.3*arima+0.2*prophet+0.25*cat+0.15*xgb+0.1*regr
-   print(final)
+   return final
     
-pred=prediction(name_regr)
+def forecast(ticker):
+    df=Models.get_stock_data(ticker,'2020-03-23','2025-03-22', "1d")
+    df=Models.preprocess(df,'close')
+    df=df.interpolate(method='linear')
+    df.index = df.index.tz_localize(None) 
 
+    last_date = df.index[-1]  
+    future_index = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=30, freq='D')
+    name=Models.best_regr(df,'close',0)
 
+    pred=prediction(df,name,future_index)
+    test=df['close'][df.index>'2025']
 
+    # return pred,test
+    fig=plt.figure(figsize=(10, 4))
+    plt.plot(test.index, test.values, label='Факт (Test)', color='blue')
+    plt.plot(future_index, pred, label='Прогноз (Pred)', color='orange', linestyle='--')
+    plt.title(f'Прогноз {ticker}')
+    plt.xlabel("Дата")
+    plt.ylabel("Значение")
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    
+    return fig
+
+forecast('APPL')
+    
