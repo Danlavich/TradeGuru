@@ -43,6 +43,7 @@ def smape(y_true, y_pred):
 
 def preprocess(df, target):
     df=df.copy()
+    
     try:
         df.drop(columns=['high','low'], inplace=True)
     except KeyError:
