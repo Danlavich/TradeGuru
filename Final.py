@@ -59,7 +59,7 @@ def forecast(ticker):
     test=df['close'][df.index>'2025']
 
     # return pred,test
-    fig=plt.figure(figsize=(10, 4))
+    plt.figure(figsize=(10, 4))
     plt.plot(test.index, test.values, label='Факт (Test)', color='blue')
     plt.plot(future_index, pred, label='Прогноз (Pred)', color='orange', linestyle='--')
     plt.title(f'Прогноз {ticker}')
@@ -69,7 +69,12 @@ def forecast(ticker):
     plt.legend()
     plt.tight_layout()
     
-    return fig
+    buf = BytesIO()   
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    image_prognose = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+    return image_prognose 
 
 forecast('APPL')
     
