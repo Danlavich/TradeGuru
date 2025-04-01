@@ -1,0 +1,450 @@
+import flet as ft
+import requests
+import yfinance as yf
+import mplfinance as mpf
+from io import StringIO, BytesIO
+import matplotlib
+import pandas as pd
+import base64
+import matplotlib.pyplot as plt
+from prediction import forecast
+
+# Переключаем backend на Agg, чтобы не возникало проблем с GUI в потоках
+matplotlib.use("Agg")
+
+def calculate_volume(df):
+    return df['Volume']
+
+# 2. Скользящие средние (Moving Average)
+def moving_average(df, window):
+    return df['Close'].rolling(window=window).mean()
+
+# 3. Экспоненциальные скользящие средние (Exponential Moving Average)
+def exponential_moving_average(df, window):
+    return df['Close'].ewm(span=window, adjust=False).mean()
+
+# 4. Индекс относительной силы (RSI)
+def calculate_rsi(df, window=14):
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+# 6. Стандартное отклонение (Volatility)
+def calculate_volatility(df, window=20):
+    return df['Close'].rolling(window=window).std()
+
+# 7. Процент изменения (Percentage Change)
+def calculate_percentage_change(df):
+    return df['Close'].pct_change() * 100
+
+# 8. MACD
+def calculate_macd(df):
+    ema12 = exponential_moving_average(df, 12)
+    ema26 = exponential_moving_average(df, 26)
+    macd = ema12 - ema26
+    return macd
+
+# 9. MACD Signal Line
+def calculate_macd_signal(df, window=9):
+    macd = calculate_macd(df)
+    return macd.rolling(window=window).mean()
+
+# 10. Bollinger Bands
+def calculate_bollinger_bands(df, window=20, num_std_dev=2):
+    ma = moving_average(df, window)
+    rolling_std = df['Close'].rolling(window).std()
+    upper_band = ma + (rolling_std * num_std_dev)
+    lower_band = ma - (rolling_std * num_std_dev)
+    return upper_band, lower_band
+
+
+
+def calculateMetrics(df):
+    df['Volume'] = calculate_volume(df)
+    df['moving_average_20'] = moving_average(df, window=20)
+    df['exponential_moving_average_20'] = exponential_moving_average(df, window=20)
+    df['rsi'] = calculate_rsi(df)
+    df['volatility'] = calculate_volatility(df)
+    df['percentage_change'] = calculate_percentage_change(df)
+    df['macd'] = calculate_macd(df)
+    df['macd_signal'] = calculate_macd_signal(df)
+    df['bollinger_upper'], df['bollinger_lower'] = calculate_bollinger_bands(df)
+
+    # Визуализация
+    plt.figure(figsize=(14, 12))
+
+    # График цен и скользящих средних
+    plt.subplot(4, 1, 1)
+    plt.plot(df.index, df['Close'], label='Цена закрытия', color='blue')
+    plt.plot(df.index, df['moving_average_20'], label='20-дневная скользящая средняя', color='orange')
+    plt.plot(df.index, df['exponential_moving_average_20'], label='20-дневная экспоненциальная скользящая средняя', color='green')
+    plt.title('Цена акций AAPL и Скользящие Средние')
+    plt.legend()
+
+    # График RSI
+    plt.subplot(4, 1, 2)
+    plt.plot(df.index, df['rsi'], label='RSI', color='purple')
+    plt.axhline(70, linestyle='--', alpha=0.5, color='red')
+    plt.axhline(30, linestyle='--', alpha=0.5, color='green')
+    plt.title('Индекс Относительной Силы (RSI)')
+    plt.legend()
+
+    # График MACD
+    plt.subplot(4, 1, 3)
+    plt.plot(df.index, df['macd'], label='MACD', color='blue')
+    plt.plot(df.index, df['macd_signal'], label='Сигнальная линия MACD', color='orange')
+    plt.title('MACD')
+    plt.legend()
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    image_ta = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+    return image_ta
+
+def get_stock_data(ticker: str, start_date: str, end_date: str, interval: str ):
+
+    try:
+        print(f"⏳ Пробуем загрузить данные с Yahoo Finance для {ticker}...")
+        stock = yf.Ticker(ticker)
+        data = stock.history(start=start_date, end=end_date, interval=interval)
+        if data is not None and not data.empty:
+            df = data[['Open', 'Close', 'Volume']].reset_index()
+            # Переименовываем столбец с датой (если он называется "Datetime" или "Date") в "date"
+            if "Datetime" in df.columns:
+                df.rename(columns={"Datetime": "date"}, inplace=True)
+            elif "Date" in df.columns:
+                df.rename(columns={"Date": "date"}, inplace=True)
+            else:
+                raise KeyError("Не найден столбец с датой в данных Yahoo Finance")
+            df["Ticker"] = ticker
+            print(f"✅ Данные загружены с Yahoo Finance для {ticker}")
+            return df
+        else:
+            print(f"⚠ Нет данных в Yahoo Finance для {ticker}. Пробуем Finam...")
+            raise Exception("Данные отсутствуют или ошибка в yfinance.")
+    except Exception as e:
+        print(f"⚠ Ошибка при загрузке данных с Yahoo Finance: {e}. Пробуем Finam...")
+        start_date_finam = start_date.replace("-", "")
+        end_date_finam = end_date.replace("-", "")
+        timeframe_map = {
+            "1m": 1, "5m": 2, "10m": 3, "15m": 4, "30m": 5,
+            "1h": 6, "1d": 7, "1wk": 8, "1mo": 9
+        }
+        timeframe = timeframe_map.get(interval, 7)
+        df_day = int(start_date_finam[6:])
+        mf = int(start_date_finam[4:6]) - 1
+        yf_val = int(start_date_finam[:4])
+        dt = int(end_date_finam[6:])
+        mt = int(end_date_finam[4:6]) - 1
+        yt = int(end_date_finam[:4])
+        params = {
+            'market': 1,
+            'em': 3,
+            'code': ticker,
+            'apply': 0,
+            'df': df_day, 'mf': mf, 'yf': yf_val,
+            'dt': dt, 'mt': mt, 'yt': yt,
+            'p': timeframe,
+            'f': f"{ticker}_{start_date_finam}_{end_date_finam}",
+            'e': '.csv',
+            'cn': ticker,
+            'dtf': 1,
+            'tmf': 1,
+            'MSOR': 1,
+            'mstimever': 1,
+            'sep': 3,
+            'sep2': 1,
+            'datf': 5,
+            'at': 1
+        }
+        url = "https://export.finam.ru/" + params['f'] + params['e']
+        response = requests.get(url, params=params)
+        if response.status_code == 200 and response.text.strip():
+            csv_data = StringIO(response.text)
+            df_finam = pd.read_csv(csv_data, delimiter=';', encoding='cp1251')
+            df_finam.columns = ["date", "time", "open", "high", "low", "close", "vol"]
+            df_finam['date'] = pd.to_datetime(df_finam['date'], format='%Y%m%d')
+            df_finam.drop(columns=['time'], inplace=True)
+            df_finam["Ticker"] = ticker
+            print(f"✅ Данные загружены с Finam для {ticker}")
+            return df_finam.reset_index()
+        else:
+            print(f"❌ Ошибка загрузки данных с Finam для {ticker}")
+            return None
+
+
+def create_graph_image(df) -> str:
+
+    ticker = df["Ticker"].iloc[0] if "Ticker" in df.columns else "Unknown"
+
+    # Определяем столбец с датой
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df.set_index("date", inplace=True)
+    elif "Datetime" in df.columns:
+        df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
+        df.set_index("Datetime", inplace=True)
+    elif "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df.set_index("Date", inplace=True)
+    else:
+        raise KeyError("Не найден столбец с датой в DataFrame")
+
+    # Определяем столбец с ценой закрытия
+    if "Close" in df.columns:
+        close_col = "Close"
+    elif "close" in df.columns:
+        close_col = "close"
+    else:
+        raise KeyError("Не найден столбец с ценой закрытия (Close/close) в DataFrame")
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(df[close_col], label='Close', color='b')
+    plt.title(f'{ticker} Shares')
+    plt.xlabel('Date')
+    plt.ylabel('Price ($)')
+    plt.grid()
+    plt.legend()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    image_ticker = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+    return image_ticker
+
+
+def main_view(page: ft.Page):
+    text_field_style = {
+        "label_style": ft.TextStyle(size=14, color=ft.Colors.BLUE_GREY_700),
+        "border_color": ft.Colors.BLUE_GREY_200,
+        "focused_border_color": ft.Colors.BLUE_ACCENT,
+    }
+
+    ticker_input = ft.TextField(label="Введите тикер", **text_field_style)
+    start_date_input = ft.TextField(label="Дата начала (YYYY-MM-DD)", **text_field_style)
+    end_date_input = ft.TextField(label="Дата окончания (YYYY-MM-DD)", **text_field_style)
+
+    interval_input = ft.Dropdown(
+        label="Интервал",
+        options=[ft.dropdown.Option(o) for o in ["1d", "1h", "30m", "15m", "5m", "1m"]],
+        **{k: v for k, v in text_field_style.items() if k != "focused_border_color"}
+    )
+
+    def analyze_data(e):
+        ticker = ticker_input.value.strip()
+        start_date = start_date_input.value.strip()
+        end_date = end_date_input.value.strip()
+        interval = interval_input.value
+
+        df = get_stock_data(ticker, start_date, end_date, interval)
+        if df is not None:
+            image_ticker = create_graph_image(df)
+            image_ta = calculateMetrics(df)
+            analysis_result = "1"  # Замените на реальные данные
+            image_prognose= forecast(ticker)
+
+            page.clean()
+            page.add(analysis_view(page, analysis_result, image_ticker, image_ta))
+            page.update()
+        else:
+            print("Ошибка при получении данных.")
+
+    analyze_button = ft.ElevatedButton(
+        text="Analyze",
+        icon=ft.icons.ANALYTICS,
+        style=ft.ButtonStyle(
+            padding=20,
+            color=ft.Colors.WHITE,
+            bgcolor=ft.Colors.BLUE_ACCENT,
+        ),
+        on_click=analyze_data
+    )
+
+    input_form = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("Stock Data Helper", style="headlineMedium"),
+                ticker_input,
+                start_date_input,
+                end_date_input,
+                interval_input,
+                analyze_button
+            ],
+            spacing=25,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER
+        ),
+        padding=40,
+        width=600,
+        bgcolor=ft.Colors.WHITE,
+        border_radius=15,
+        shadow=ft.BoxShadow(
+            spread_radius=1,
+            blur_radius=25,
+            color=ft.Colors.BLUE_100
+        )
+    )
+
+    page.clean()
+    page.add(
+        ft.ListView(
+            expand=True,
+            auto_scroll=True,
+            controls=[
+                ft.Container(
+                    content=input_form,
+                    alignment=ft.alignment.center,
+                    gradient=ft.LinearGradient(
+                        begin=ft.alignment.top_center,
+                        end=ft.alignment.bottom_center,
+                        colors=[ft.Colors.BLUE_50, ft.Colors.WHITE]
+                    ),
+                    padding=40
+                )
+            ]
+        )
+    )
+    page.update()
+
+def analysis_view(page: ft.Page, result: str, image_data: str, image_ta):
+    header_style = ft.TextStyle(size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_GREY_800)
+    shadow = ft.BoxShadow(spread_radius=1, blur_radius=15, color=ft.Colors.BLUE_100)
+
+    charts = ft.Column(
+        height=700,
+        scroll=ft.ScrollMode.ALWAYS,
+        spacing=40,
+        controls=[
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("График цен", style=header_style),
+                    ft.Image(
+                        src_base64=image_data,
+                        width=800,
+                        height=400,
+                        fit=ft.ImageFit.CONTAIN
+                    )
+                ], spacing=15),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=15,
+                shadow=shadow
+            ),
+
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("Технический анализ", style=header_style),
+                    ft.Image(
+                        src_base64=image_ta,
+                        width=800,
+                        height=600,
+                        fit=ft.ImageFit.CONTAIN
+                    )
+                ], spacing=15),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=15,
+                shadow=shadow
+            ),
+            # ft.Container(
+            #     content=ft.Column([
+            #         ft.Text("прогнозный график", style=header_style),
+            #         ft.Image(
+            #             src_base64=image_prognose,
+            #             width=800,
+            #             height=400,
+            #             fit=ft.ImageFit.CONTAIN
+            #         )
+            #     ], spacing=15),
+            #     padding=20,
+            #     bgcolor=ft.Colors.WHITE,
+            #     border_radius=15,
+            #     shadow=shadow
+            # ),
+        ]
+    )
+
+    info_panel = ft.Column(
+        spacing=30,
+        controls=[
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("Дополнительная информация от языковой модели", style=header_style),
+                    ft.TextField(
+                        multiline=True,
+                        read_only=True,
+                        border_color=ft.Colors.TRANSPARENT,
+                        height=200
+                    )
+                ]),
+                padding=20,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=15,
+                shadow=shadow
+            )
+        ]
+    )
+
+    layout = ft.Container(
+        content=ft.ListView(
+            expand=True,
+            auto_scroll=True,
+            controls=[
+                ft.Row(
+                    [charts, info_panel],
+                    spacing=40,
+                    vertical_alignment=ft.CrossAxisAlignment.START
+                )
+            ]
+        ),
+        padding=40,
+        expand=True,
+        gradient=ft.LinearGradient(
+            colors=[ft.Colors.BLUE_50, ft.Colors.WHITE]
+        )
+    )
+
+    back_button = ft.ElevatedButton(
+        text="Назад",
+        icon=ft.Icons.ARROW_BACK,
+        style=ft.ButtonStyle(
+            padding=20,
+            color=ft.Colors.BLUE_ACCENT
+        ),
+        on_click=lambda e: main_view(page)
+    )
+
+    return ft.ListView(
+        expand=True,
+        controls=[
+            ft.Column(
+                [layout, ft.Divider(height=10), back_button],
+                spacing=30
+            )
+        ]
+    )
+
+def main(page: ft.Page):
+    page.title = "Trade Guru"
+    page.theme = ft.Theme(
+        color_scheme=ft.ColorScheme(
+            primary=ft.Colors.BLUE,
+            secondary=ft.Colors.BLUE_ACCENT
+        ),
+        text_theme=ft.TextTheme(
+            body_medium=ft.TextStyle(size=16),
+            title_medium=ft.TextStyle(size=20, weight=ft.FontWeight.BOLD)
+        )
+    )
+    page.fonts = {
+        "Roboto": "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+    }
+    main_view(page)
+
+ft.app(target=main)
